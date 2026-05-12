@@ -1,36 +1,171 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# 🧠 EaseTinker
 
-## Getting Started
+**Orchestrador visual de fine-tuning de LLMs via Tinker SDK (ThinkingMachines)**
 
-First, run the development server:
+EaseTinker é uma aplicação web que simplifica o processo de fine-tuning de modelos de linguagem usando a plataforma [Tinker](https://tinker-docs.thinkingmachines.ai). Sem escrever código Python, o usuário configura, lança e monitora jobs de treinamento diretamente pelo navegador.
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+---
+
+## 📋 Índice
+
+- [Visão Geral](#-visão-geral)
+- [Arquitetura](#-arquitetura)
+- [Pré-requisitos](#-pré-requisitos)
+- [Deploy em Produção (Hostinger VPS)](#-deploy-em-produção-hostinger-vps)
+- [Instalação Local (Desenvolvimento)](#-instalação-local-desenvolvimento)
+- [Variáveis de Ambiente](#-variáveis-de-ambiente)
+
+---
+
+## 🎯 Visão Geral
+
+O Tinker SDK é poderoso para fine-tuning de LLMs, mas requer conhecimento de Python, gerenciamento manual de loops de treinamento, e monitoramento por terminal.
+
+O **EaseTinker** oferece uma interface web intuitiva para orquestrar tudo isso de forma visual. O usuário apenas fornece a sua API Key do [Tinker Console](https://tinker-console.thinkingmachines.ai) e a aplicação cuida do resto, gerenciando datasets, hiperparâmetros e monitorando o loss de treinamento em tempo real.
+
+---
+
+## 🏗 Arquitetura
+
+O sistema funciona com dois serviços principais empacotados no Docker Compose:
+1. **Next.js (App)**: Frontend, Autenticação, Interface e Gateway REST.
+2. **Python Worker**: Comunica-se exclusivamente via rede interna com o Next.js e se conecta externamente ao Tinker Cloud via gRPC.
+
+```text
+┌──────────────────────────────────────────────────────┐
+│                    VPS Hostinger                     │
+│  ┌──────────┐    ┌─────────────────────────────────┐ │
+│  │ Traefik  │───▶│     Docker Compose Network      │ │
+│  │(Hostinger│    │  ┌───────────┐  ┌────────────┐  │ │
+│  │ managed) │    │  │ Next.js   │  │  Python    │  │ │
+│  └──────────┘    │  │ App :3000 │──│ Worker:8000│  │ │
+│                  │  └─────┬─────┘  └─────┬──────┘  │ │
+│                  │        │              │         │ │
+│                  │  ┌─────┴─────┐  ┌─────┴──────┐  │ │
+│                  │  │PostgreSQL │  │   Redis    │  │ │
+│                  │  └───────────┘  └────────────┘  │ │
+│                  └─────────────────────────────────┘ │
+└──────────────────────────────────────────────────────┘
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+---
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## 🚀 Deploy em Produção (Hostinger VPS)
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+A aplicação foi desenhada nativamente para ser hospedada em uma **VPS da Hostinger com Docker e Traefik**. O Traefik da Hostinger detecta os rótulos (labels) no `docker-compose.yml` e gerencia automaticamente a emissão dos certificados SSL/HTTPS.
 
-## Learn More
+### Passo 1: Pré-requisitos do Servidor
 
-To learn more about Next.js, take a look at the following resources:
+1. Conecte-se via SSH à sua VPS da Hostinger.
+2. Certifique-se de ter um domínio apontado para o IP da sua VPS (ex: `easetinker.seudominio.com`).
+3. O Traefik já deve estar instalado (padrão da imagem Docker da Hostinger).
+4. Crie a rede pública do Traefik caso ela não exista:
+   ```bash
+   docker network create traefik-public
+   ```
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+### Passo 2: Baixar o Repositório
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+No servidor da Hostinger, clone o repositório na pasta de sua escolha (ex: `/opt/easetinker`):
 
-## Deploy on Vercel
+```bash
+git clone https://github.com/danielbfs/easytinker.git /opt/easetinker
+cd /opt/easetinker
+```
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+### Passo 3: Configurar Variáveis de Ambiente
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+Copie o modelo e preencha as credenciais reais:
+
+```bash
+cp .env.example .env
+nano .env
+```
+
+Garanta que as seguintes variáveis estejam preenchidas corretamente no `.env`:
+- `APP_DOMAIN`: O seu domínio exato (ex: `easetinker.seudominio.com`). O Traefik usará isso!
+- `NEXTAUTH_SECRET`: Gere com `openssl rand -base64 32`.
+- `ENCRYPTION_KEY`: Gere com `openssl rand -hex 32`.
+- `GOOGLE_CLIENT_ID` e `GITHUB_CLIENT_ID` para o login.
+- `POSTGRES_PASSWORD`: Defina uma senha forte.
+
+### Passo 4: Subir os Containers (Docker Compose)
+
+Execute o build e inicialize todos os containers em modo daemon (segundo plano):
+
+```bash
+docker compose up -d --build
+```
+
+O comando irá criar 4 containers:
+- `easetinker-postgres`
+- `easetinker-redis`
+- `easetinker-worker`
+- `easetinker-app` (O único exposto ao Traefik externamente)
+
+### Passo 5: Migrations do Banco de Dados
+
+Com os containers em execução, aplique a estrutura do banco de dados (schema do Prisma):
+
+```bash
+docker compose exec app npx prisma migrate deploy
+```
+
+### Passo 6: Verificar Status e Logs
+
+Verifique se todos os containers estão saudáveis (`healthy`):
+
+```bash
+docker compose ps
+```
+
+Caso algo não funcione, inspecione os logs:
+
+```bash
+docker compose logs -f app
+```
+
+Acesse o seu domínio (`https://easetinker.seudominio.com`) no navegador. O SSL deve estar configurado automaticamente pelo Traefik.
+
+---
+
+### Deploy Contínuo (CI/CD via GitHub Actions)
+
+Se preferir automatizar esse processo de deploy, você pode configurar as **GitHub Secrets** no repositório. O workflow em `.github/workflows/deploy.yml` fará o acesso SSH ao seu servidor na Hostinger e rodará os comandos de atualização e build a cada novo commit na branch `main`.
+
+Secrets necessários no GitHub:
+- `VPS_HOST`, `VPS_USER`, `VPS_SSH_KEY`
+- `APP_DOMAIN`, `NEXTAUTH_SECRET`, `ENCRYPTION_KEY`
+- `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`
+- `GITHUB_CLIENT_ID`, `GITHUB_CLIENT_SECRET`
+- `POSTGRES_PASSWORD`, `WORKER_SECRET`
+
+---
+
+## 💻 Instalação Local (Desenvolvimento)
+
+Caso queira modificar o sistema na sua máquina antes de mandar para a Hostinger:
+
+1. Suba apenas os serviços de apoio (DB e Redis):
+   ```bash
+   docker compose -f docker-compose.dev.yml up -d postgres redis
+   ```
+2. Instale os pacotes Node:
+   ```bash
+   pnpm install
+   ```
+3. Aplique o banco:
+   ```bash
+   pnpm prisma generate
+   pnpm prisma migrate dev
+   ```
+4. Prepare o ambiente Python (Worker):
+   ```bash
+   cd worker
+   python -m venv .venv
+   .venv\Scripts\activate   # ou source .venv/bin/activate no Mac/Linux
+   pip install -r requirements.txt
+   ```
+5. Inicie as duas camadas em terminais separados:
+   - Terminal 1: `pnpm dev`
+   - Terminal 2: `cd worker && uvicorn main:app --reload`
