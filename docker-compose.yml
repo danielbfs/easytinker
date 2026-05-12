@@ -1,0 +1,102 @@
+services:
+  app:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.next
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
+      REDIS_URL: redis://redis:6379
+      NEXTAUTH_URL: https://${APP_DOMAIN}
+      NEXTAUTH_SECRET: ${NEXTAUTH_SECRET}
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID}
+      GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET}
+      GITHUB_CLIENT_ID: ${GITHUB_CLIENT_ID}
+      GITHUB_CLIENT_SECRET: ${GITHUB_CLIENT_SECRET}
+      ENCRYPTION_KEY: ${ENCRYPTION_KEY}
+      WORKER_URL: http://worker:8000
+      WORKER_SECRET: ${WORKER_SECRET}
+      NODE_ENV: production
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      worker:
+        condition: service_healthy
+    networks:
+      - internal
+      - traefik-public
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.easetinker.rule=Host(`${APP_DOMAIN}`)"
+      - "traefik.http.routers.easetinker.entrypoints=websecure"
+      - "traefik.http.routers.easetinker.tls.certresolver=letsencrypt"
+      - "traefik.http.services.easetinker.loadbalancer.server.port=3000"
+      # Security headers middleware
+      - "traefik.http.middlewares.easetinker-headers.headers.stsSeconds=31536000"
+      - "traefik.http.middlewares.easetinker-headers.headers.stsIncludeSubdomains=true"
+      - "traefik.http.middlewares.easetinker-headers.headers.forceSTSHeader=true"
+      - "traefik.http.middlewares.easetinker-headers.headers.contentTypeNosniff=true"
+      - "traefik.http.middlewares.easetinker-headers.headers.browserXssFilter=true"
+      - "traefik.http.middlewares.easetinker-headers.headers.referrerPolicy=strict-origin-when-cross-origin"
+      - "traefik.http.routers.easetinker.middlewares=easetinker-headers"
+    volumes:
+      - uploads:/data/uploads
+
+  worker:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.worker
+    restart: unless-stopped
+    environment:
+      REDIS_URL: redis://redis:6379
+      WORKER_SECRET: ${WORKER_SECRET}
+    depends_on:
+      redis:
+        condition: service_healthy
+    networks:
+      - internal
+    # Worker is NOT exposed externally — internal only
+
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - internal
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    command: redis-server --appendonly yes --maxmemory 256mb --maxmemory-policy allkeys-lru
+    volumes:
+      - redis_data:/data
+    networks:
+      - internal
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  postgres_data:
+  redis_data:
+  uploads:
+
+networks:
+  internal:
+    driver: bridge
+  traefik-public:
+    external: true

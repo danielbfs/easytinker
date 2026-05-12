@@ -1,0 +1,48 @@
+# ─── Environment ──────────────────────────────────────────────────────────────
+.env
+.env.local
+.env.production
+.env.*.local
+
+# ─── Next.js ──────────────────────────────────────────────────────────────────
+.next/
+out/
+build/
+dist/
+
+# ─── Node ─────────────────────────────────────────────────────────────────────
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+.pnpm-store/
+
+# ─── Python ───────────────────────────────────────────────────────────────────
+worker/.venv/
+worker/__pycache__/
+worker/**/__pycache__/
+worker/*.pyc
+worker/*.pyo
+worker/.pytest_cache/
+worker/.mypy_cache/
+
+# ─── Docker ───────────────────────────────────────────────────────────────────
+# (nothing to ignore — docker-compose files are committed)
+
+# ─── Prisma ───────────────────────────────────────────────────────────────────
+prisma/migrations/dev/
+
+# ─── OS ───────────────────────────────────────────────────────────────────────
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+
+# ─── IDE ──────────────────────────────────────────────────────────────────────
+.idea/
+.vscode/settings.json
+*.code-workspace
+
+# ─── Uploads ──────────────────────────────────────────────────────────────────
+/data/uploads/
