@@ -129,7 +129,26 @@ Acesse o seu domínio (`https://easetinker.seudominio.com`) no navegador. O SSL 
 
 ---
 
-### Deploy Contínuo (CI/CD via GitHub Actions)
+### Passo 7: Como Atualizar (Novo Deploy Manual)
+
+Sempre que houver atualizações ou modificações no código pelo GitHub, conecte-se via SSH na Hostinger, vá até a pasta do projeto e rode os seguintes comandos para puxar as novidades e reiniciar os containers:
+
+```bash
+cd /opt/easetinker
+
+# Baixa as atualizações do GitHub
+git pull origin main
+
+# Refaz o build usando cache e sobe os novos containers sem derrubar o banco
+docker compose up -d --build
+
+# (Opcional) Executa migrations caso o banco de dados tenha mudado
+docker compose exec app npx prisma migrate deploy
+```
+
+---
+
+### Deploy Contínuo (Automático via GitHub Actions)
 
 Se preferir automatizar esse processo de deploy, você pode configurar as **GitHub Secrets** no repositório. O workflow em `.github/workflows/deploy.yml` fará o acesso SSH ao seu servidor na Hostinger e rodará os comandos de atualização e build a cada novo commit na branch `main`.
 
