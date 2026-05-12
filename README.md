@@ -66,11 +66,11 @@ A aplicação foi desenhada nativamente para ser hospedada em uma **VPS da Hosti
 
 ### Passo 2: Baixar o Repositório
 
-No servidor da Hostinger, clone o repositório na pasta de sua escolha (ex: `/opt/easetinker`):
+No servidor da Hostinger, clone o repositório na pasta de sua escolha (ex: `/docker/easetinker`):
 
 ```bash
-git clone https://github.com/danielbfs/easytinker.git /opt/easetinker
-cd /opt/easetinker
+git clone https://github.com/danielbfs/easytinker.git /docker/easetinker
+cd /docker/easetinker
 ```
 
 ### Passo 3: Configurar Variáveis de Ambiente
@@ -134,7 +134,7 @@ Acesse o seu domínio (`https://easetinker.seudominio.com`) no navegador. O SSL 
 Sempre que houver atualizações ou modificações no código pelo GitHub, conecte-se via SSH na Hostinger, vá até a pasta do projeto e rode os seguintes comandos para puxar as novidades e reiniciar os containers:
 
 ```bash
-cd /opt/easetinker
+cd /docker/easetinker
 
 # Baixa as atualizações do GitHub
 git pull origin main
