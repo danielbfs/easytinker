@@ -44,5 +44,8 @@ Thumbs.db
 .vscode/settings.json
 *.code-workspace
 
+# ─── Claude Code ──────────────────────────────────────────────────────────────
+.claude/
+
 # ─── Uploads ──────────────────────────────────────────────────────────────────
 /data/uploads/

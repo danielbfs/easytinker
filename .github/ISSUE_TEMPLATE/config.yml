@@ -1,0 +1,5 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Ask a Question / Fazer uma Pergunta
+    url: https://github.com/danielbfs/easetinker/discussions
+    about: Use GitHub Discussions for questions and community help / Use o GitHub Discussions para perguntas e ajuda da comunidade

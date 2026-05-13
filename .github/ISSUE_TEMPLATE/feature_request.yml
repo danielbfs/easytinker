@@ -1,0 +1,56 @@
+name: Feature Request
+description: Suggest a new feature or improvement / Sugerir uma nova funcionalidade ou melhoria
+title: "[Feature]: "
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        **EN:** Thanks for suggesting a feature! Please describe it as clearly as possible.
+        **PT:** Obrigado pela sugestão! Descreva a funcionalidade da forma mais clara possível.
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: "Problem / Problema"
+      description: "What problem does this feature solve? / Qual problema essa funcionalidade resolve?"
+      placeholder: "I find it difficult to... / Tenho dificuldade em..."
+    validations:
+      required: true
+
+  - type: textarea
+    id: solution
+    attributes:
+      label: "Proposed Solution / Solução Proposta"
+      description: "Describe the solution you'd like. / Descreva a solução que você gostaria."
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: "Alternatives Considered / Alternativas Consideradas"
+      description: "Any alternative solutions you've considered. / Alternativas que você considerou."
+
+  - type: dropdown
+    id: scope
+    attributes:
+      label: "Scope / Escopo"
+      options:
+        - UI / Frontend
+        - Training / Treinamento
+        - Data Sources / Fontes de Dados
+        - Authentication / Autenticação
+        - Deployment / Deploy
+        - Documentation / Documentação
+        - Other / Outro
+    validations:
+      required: true
+
+  - type: checkboxes
+    id: terms
+    attributes:
+      label: Checklist
+      options:
+        - label: "I have searched existing issues and this is not a duplicate. / Pesquisei as issues existentes e isso não é uma duplicata."
+          required: true
