@@ -146,20 +146,7 @@ docker compose up -d --build
 docker compose exec app npx prisma migrate deploy
 ```
 
----
 
-### Deploy Contínuo (Automático via GitHub Actions)
-
-Se preferir automatizar esse processo de deploy, você pode configurar as **GitHub Secrets** no repositório. O workflow em `.github/workflows/deploy.yml` fará o acesso SSH ao seu servidor na Hostinger e rodará os comandos de atualização e build a cada novo commit na branch `main`.
-
-Secrets necessários no GitHub:
-- `VPS_HOST`, `VPS_USER`, `VPS_SSH_KEY`
-- `APP_DOMAIN`, `NEXTAUTH_SECRET`, `ENCRYPTION_KEY`
-- `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`
-- `GITHUB_CLIENT_ID`, `GITHUB_CLIENT_SECRET`
-- `POSTGRES_PASSWORD`, `WORKER_SECRET`
-
----
 
 ## 💻 Instalação Local (Desenvolvimento)
 
