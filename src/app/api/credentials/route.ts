@@ -94,13 +94,8 @@ export async function POST(req: Request) {
     )
   }
 
-  if (!validation.valid) {
-    return NextResponse.json(
-      { ok: false, error: validation.error ?? "Tinker rejected the key" },
-      { status: 400 },
-    )
-  }
-
+  // Persist the key regardless of validation outcome — the user can hit
+  // Revalidate later once they've fixed the underlying issue (e.g. billing).
   const enc = encrypt(apiKey)
   await prisma.tinkerCredential.upsert({
     where: { userId },
@@ -109,20 +104,22 @@ export async function POST(req: Request) {
       encryptedKey: enc.ciphertext,
       iv: enc.iv,
       authTag: enc.authTag,
-      isValid: true,
+      isValid: validation.valid,
       validatedAt: new Date(),
     },
     update: {
       encryptedKey: enc.ciphertext,
       iv: enc.iv,
       authTag: enc.authTag,
-      isValid: true,
+      isValid: validation.valid,
       validatedAt: new Date(),
     },
   })
 
   return NextResponse.json({
-    ok: true,
+    ok: validation.valid,
+    saved: true,
+    error: validation.valid ? null : validation.error ?? "Tinker rejected the key",
     models: validation.supported_models ?? [],
     maxBatchSize: validation.max_batch_size ?? null,
   })

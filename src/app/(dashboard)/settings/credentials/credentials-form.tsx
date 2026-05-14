@@ -12,6 +12,7 @@ type Status = {
 
 type ValidationResult = {
   ok: boolean
+  saved?: boolean
   valid?: boolean
   error?: string | null
   models?: unknown[]
@@ -72,9 +73,11 @@ export function CredentialsForm({ initialStatus }: { initialStatus: Status }) {
       })
       const data = await res.json()
       setResult({ ok: res.ok && data.ok, ...data })
-      if (res.ok && data.ok) {
+      // The key gets persisted whenever the API returns `saved: true`, even
+      // when validation failed (e.g. billing paused) — refresh status so the
+      // user sees the new record and can click Revalidate later.
+      if (res.ok && data.saved) {
         setApiKey("")
-        // refresh status
         const statusRes = await fetch("/api/credentials")
         const statusData = await statusRes.json()
         setStatus(statusData.credential)
@@ -206,6 +209,12 @@ export function CredentialsForm({ initialStatus }: { initialStatus: Status }) {
               <p className="text-sm leading-relaxed">
                 {renderWithLinks(result.error ?? "Unknown error")}
               </p>
+              {result.saved && (
+                <p className="text-xs text-muted-foreground">
+                  The key was saved anyway. Use the Revalidate button above
+                  once the underlying issue is fixed.
+                </p>
+              )}
             </div>
           )}
         </section>
