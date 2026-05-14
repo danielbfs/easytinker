@@ -2,6 +2,7 @@
 EaseTinker — Python Worker
 FastAPI service that wraps the Tinker SDK for fine-tuning orchestration.
 """
+import asyncio
 import os
 import logging
 from contextlib import asynccontextmanager
@@ -13,6 +14,8 @@ from schemas import (
     StartJobRequest,
     JobStatusResponse,
     HealthResponse,
+    ValidateTinkerKeyRequest,
+    ValidateTinkerKeyResponse,
 )
 from job_runner import JobRunner
 
@@ -71,6 +74,46 @@ app.add_middleware(
 async def health():
     """Health check endpoint (no auth required)."""
     return HealthResponse(status="ok")
+
+
+# Serialize validation calls: the Tinker SDK reads TINKER_API_KEY from process
+# env, so we can't safely run two validations with different keys in parallel.
+_tinker_validate_lock = asyncio.Lock()
+
+
+@app.post(
+    "/tinker/validate",
+    response_model=ValidateTinkerKeyResponse,
+    dependencies=[Depends(verify_secret)],
+)
+async def validate_tinker_key(req: ValidateTinkerKeyRequest):
+    """Validate a Tinker API key by querying server capabilities."""
+    async with _tinker_validate_lock:
+        try:
+            import tinker
+            os.environ["TINKER_API_KEY"] = req.api_key
+            client = tinker.ServiceClient()
+            caps = await client.get_server_capabilities_async()
+            supported = getattr(caps, "supported_models", None)
+            max_batch = getattr(caps, "max_batch_size", None)
+            # supported_models items may be pydantic objects — coerce to dict/list
+            if supported is not None:
+                try:
+                    supported = [
+                        m.model_dump() if hasattr(m, "model_dump") else m
+                        for m in supported
+                    ]
+                except Exception:
+                    pass
+            logger.info(f"Tinker key validated, {len(supported) if supported else 0} models")
+            return ValidateTinkerKeyResponse(
+                valid=True,
+                supported_models=supported,
+                max_batch_size=max_batch,
+            )
+        except Exception as e:
+            logger.warning(f"Tinker key validation failed: {e}")
+            return ValidateTinkerKeyResponse(valid=False, error=str(e))
 
 
 @app.post("/jobs/start", dependencies=[Depends(verify_secret)])

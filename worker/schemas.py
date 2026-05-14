@@ -1,8 +1,19 @@
 """
 Pydantic schemas for the EaseTinker worker API.
 """
-from typing import Optional
+from typing import Any, Optional
 from pydantic import BaseModel, Field
+
+
+class ValidateTinkerKeyRequest(BaseModel):
+    api_key: str = Field(..., description="Tinker API key to validate")
+
+
+class ValidateTinkerKeyResponse(BaseModel):
+    valid: bool
+    error: Optional[str] = None
+    supported_models: Optional[list[Any]] = None
+    max_batch_size: Optional[int] = None
 
 
 class StartJobRequest(BaseModel):
