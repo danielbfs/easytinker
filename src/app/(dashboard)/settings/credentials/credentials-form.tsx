@@ -30,6 +30,29 @@ function modelLabel(m: unknown): string {
   return String(m)
 }
 
+// Renders text with any http(s) URL turned into a clickable link. Used for
+// validation errors that include things like the Tinker billing console URL.
+function renderWithLinks(text: string): React.ReactNode[] {
+  const urlPattern = /(https?:\/\/[^\s)]+)/g
+  const parts = text.split(urlPattern)
+  return parts.map((part, i) => {
+    if (i % 2 === 1) {
+      return (
+        <a
+          key={i}
+          href={part}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="underline text-blue-600 dark:text-blue-400 break-all"
+        >
+          {part}
+        </a>
+      )
+    }
+    return <span key={i}>{part}</span>
+  })
+}
+
 export function CredentialsForm({ initialStatus }: { initialStatus: Status }) {
   const [status, setStatus] = useState<Status>(initialStatus)
   const [apiKey, setApiKey] = useState("")
@@ -176,13 +199,13 @@ export function CredentialsForm({ initialStatus }: { initialStatus: Status }) {
               )}
             </div>
           ) : (
-            <div className="flex flex-col gap-1 text-sm">
+            <div className="flex flex-col gap-2 text-sm">
               <span className="font-semibold text-red-600 dark:text-red-400">
                 Validation failed
               </span>
-              <span className="text-muted-foreground font-mono text-xs">
-                {result.error ?? "Unknown error"}
-              </span>
+              <p className="text-sm leading-relaxed">
+                {renderWithLinks(result.error ?? "Unknown error")}
+              </p>
             </div>
           )}
         </section>

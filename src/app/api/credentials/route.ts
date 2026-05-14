@@ -8,28 +8,45 @@ export const dynamic = "force-dynamic"
 
 const WORKER_URL = process.env.WORKER_URL ?? "http://worker:8000"
 
+// Worker times out internally after ~20s; we give it 30s of margin.
+const VALIDATE_FETCH_TIMEOUT_MS = 30_000
+
 async function callWorkerValidate(apiKey: string) {
   const secret = process.env.WORKER_SECRET
   if (!secret) throw new Error("WORKER_SECRET is not set")
 
-  const res = await fetch(`${WORKER_URL}/tinker/validate`, {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${secret}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({ api_key: apiKey }),
-    cache: "no-store",
-  })
-  if (!res.ok) {
-    const text = await res.text().catch(() => "")
-    throw new Error(`worker returned ${res.status}: ${text.slice(0, 200)}`)
-  }
-  return (await res.json()) as {
-    valid: boolean
-    error?: string | null
-    supported_models?: unknown[] | null
-    max_batch_size?: number | null
+  const controller = new AbortController()
+  const timer = setTimeout(() => controller.abort(), VALIDATE_FETCH_TIMEOUT_MS)
+  try {
+    const res = await fetch(`${WORKER_URL}/tinker/validate`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${secret}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ api_key: apiKey }),
+      cache: "no-store",
+      signal: controller.signal,
+    })
+    if (!res.ok) {
+      const text = await res.text().catch(() => "")
+      throw new Error(`worker returned ${res.status}: ${text.slice(0, 200)}`)
+    }
+    return (await res.json()) as {
+      valid: boolean
+      error?: string | null
+      supported_models?: unknown[] | null
+      max_batch_size?: number | null
+    }
+  } catch (err) {
+    if ((err as Error).name === "AbortError") {
+      throw new Error(
+        `Validation request timed out after ${VALIDATE_FETCH_TIMEOUT_MS / 1000}s`,
+      )
+    }
+    throw err
+  } finally {
+    clearTimeout(timer)
   }
 }
 

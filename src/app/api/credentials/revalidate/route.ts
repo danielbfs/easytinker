@@ -43,6 +43,8 @@ export async function POST() {
     supported_models?: unknown[] | null
     max_batch_size?: number | null
   }
+  const controller = new AbortController()
+  const timer = setTimeout(() => controller.abort(), 30_000)
   try {
     const res = await fetch(`${WORKER_URL}/tinker/validate`, {
       method: "POST",
@@ -52,14 +54,18 @@ export async function POST() {
       },
       body: JSON.stringify({ api_key: apiKey }),
       cache: "no-store",
+      signal: controller.signal,
     })
     if (!res.ok) throw new Error(`worker returned ${res.status}`)
     validation = await res.json()
   } catch (err) {
-    return NextResponse.json(
-      { error: `Failed to reach worker: ${(err as Error).message}` },
-      { status: 502 },
-    )
+    const msg =
+      (err as Error).name === "AbortError"
+        ? "Validation request timed out after 30s"
+        : `Failed to reach worker: ${(err as Error).message}`
+    return NextResponse.json({ error: msg }, { status: 502 })
+  } finally {
+    clearTimeout(timer)
   }
 
   await prisma.tinkerCredential.update({
