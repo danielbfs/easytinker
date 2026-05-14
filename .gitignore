@@ -4,6 +4,9 @@
 .env.production
 .env.*.local
 
+# Local-only scratch files (e.g. one-shot bash scripts uploaded to the server)
+.tmp-*
+
 # ─── Next.js ──────────────────────────────────────────────────────────────────
 .next/
 out/
