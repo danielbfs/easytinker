@@ -97,13 +97,7 @@ EaseTinker is designed to be hosted on a **Hostinger VPS with Docker and Traefik
 
 ### Step 1 — Server Prerequisites
 
-Connect to your VPS via SSH and create the Traefik public network if it does not exist yet:
-
-```bash
-docker network create traefik-public
-```
-
-Make sure your domain is already pointing to your VPS IP address.
+Make sure your domain is already pointing to your VPS IP address. The Docker stack assumes a Traefik instance is already running on the host (any configuration — bridge, host mode, etc).
 
 ### Step 2 — Clone the Repository
 
@@ -121,20 +115,18 @@ nano .env
 
 Fill in the following required values:
 
-| Variable | Description | How to generate |
-|----------|-------------|-----------------|
+| Variable | Description | How to obtain |
+|----------|-------------|---------------|
 | `APP_DOMAIN` | Your exact domain (no `https://`) | e.g. `easetinker.yourdomain.com` |
-| `NEXTAUTH_SECRET` | JWT signing secret | `openssl rand -base64 32` |
-| `ENCRYPTION_KEY` | AES-256-GCM key for API keys | `openssl rand -hex 32` |
 | `GOOGLE_CLIENT_ID` | Google OAuth client ID | [Google Cloud Console](https://console.cloud.google.com/) |
 | `GOOGLE_CLIENT_SECRET` | Google OAuth secret | [Google Cloud Console](https://console.cloud.google.com/) |
 | `GITHUB_CLIENT_ID` | GitHub OAuth client ID | [GitHub Developer Settings](https://github.com/settings/developers) |
 | `GITHUB_CLIENT_SECRET` | GitHub OAuth secret | [GitHub Developer Settings](https://github.com/settings/developers) |
-| `POSTGRES_PASSWORD` | Strong database password | `openssl rand -base64 24` |
-| `WORKER_SECRET` | Shared secret for internal auth | `openssl rand -hex 32` |
 
 > **OAuth Callback URLs** — When creating OAuth apps, set the callback URL to:
 > `https://easetinker.yourdomain.com/api/auth/callback/google` (and `/github`)
+
+> **Technical secrets are auto-generated.** `POSTGRES_PASSWORD`, `NEXTAUTH_SECRET`, `ENCRYPTION_KEY`, and `WORKER_SECRET` are generated on first deploy by the `init-secrets` container and stored in the `secrets` named volume — you don't need to put them in `.env`. See [`.env.example`](.env.example) for details on rotation.
 
 ### Step 4 — Start the Containers
 
@@ -142,8 +134,9 @@ Fill in the following required values:
 docker compose up -d --build
 ```
 
-This creates 4 containers:
-- `easetinker-postgres` — PostgreSQL 16 database
+This creates 5 containers:
+- `init-secrets` — runs once on first boot, generates technical secrets into the `secrets` volume, then exits
+- `easetinker-postgres` — PostgreSQL 16 database (reads its password from the `secrets` volume)
 - `easetinker-redis` — Redis 7 cache and job queue
 - `easetinker-worker` — Python FastAPI worker (internal only)
 - `easetinker-app` — Next.js app (exposed via Traefik with HTTPS)
@@ -151,8 +144,10 @@ This creates 4 containers:
 ### Step 5 — Run Database Migrations
 
 ```bash
-docker compose exec app pnpm exec prisma migrate deploy
+docker compose exec app /usr/local/bin/docker-entrypoint.sh pnpm exec prisma migrate deploy
 ```
+
+> The migration command goes through the entrypoint script so that it picks up `DATABASE_URL` and the other secret-derived env vars (the entrypoint reads them from the `secrets` volume; `docker exec` by default does NOT inherit env vars exported by the container's main process).
 
 > Use `pnpm exec` (not `npx`), so the Prisma version pinned in `package.json` is used. `npx prisma` will silently fetch the latest version from the registry, which can be incompatible.
 
@@ -183,7 +178,7 @@ If you installed via Hostinger's Docker Manager (the UI cloned the repo for you)
 2. Click **Rebuild** (or **Redeploy**). Hostinger clones the latest `main` into a temporary directory, rebuilds the images, and restarts the containers. Your `.env` and named volumes are preserved.
 3. After the rebuild finishes, apply migrations via SSH:
    ```bash
-   docker compose -p easetinker exec app pnpm exec prisma migrate deploy
+   docker compose -p easetinker exec app /usr/local/bin/docker-entrypoint.sh pnpm exec prisma migrate deploy
    ```
 
 ### Option B — Manual via SSH (git clone in `/docker/easetinker/`)
@@ -200,7 +195,7 @@ git pull origin main
 docker compose up -d --build
 
 # 3. Apply any new database migrations
-docker compose exec app pnpm exec prisma migrate deploy
+docker compose exec app /usr/local/bin/docker-entrypoint.sh pnpm exec prisma migrate deploy
 
 # 4. Confirm everything is healthy
 docker compose ps
@@ -264,24 +259,32 @@ The app will be available at `http://localhost:3000`.
 
 ## Environment Variables
 
-See [`.env.example`](.env.example) for the full list with descriptions and generation commands.
+See [`.env.example`](.env.example) for the full list. **You only fill in domain + OAuth in `.env`.** The four technical secrets are generated automatically.
+
+### From `.env` (user-supplied)
 
 | Variable | Required | Description |
 |----------|----------|-------------|
 | `APP_DOMAIN` | Yes | Your domain (no `https://`) |
-| `NEXTAUTH_URL` | Yes | Full URL including `https://` |
-| `NEXTAUTH_SECRET` | Yes | JWT signing secret |
 | `GOOGLE_CLIENT_ID` | Yes* | Google OAuth (*at least one provider required) |
 | `GOOGLE_CLIENT_SECRET` | Yes* | Google OAuth |
 | `GITHUB_CLIENT_ID` | Yes* | GitHub OAuth |
 | `GITHUB_CLIENT_SECRET` | Yes* | GitHub OAuth |
-| `ENCRYPTION_KEY` | Yes | AES-256-GCM hex key (32 bytes) |
-| `DATABASE_URL` | Yes | PostgreSQL connection string |
-| `REDIS_URL` | Yes | Redis connection string |
-| `WORKER_URL` | Yes | Internal worker URL |
-| `WORKER_SECRET` | Yes | Shared secret for worker auth |
+| `POSTGRES_USER` | Yes | DB username (default `easetinker`) |
+| `POSTGRES_DB` | Yes | DB name (default `easetinker`) |
 | `MAX_FILE_SIZE_MB` | No | Max upload size (default: 50) |
 | `UPLOAD_DIR` | No | Upload directory (default: /data/uploads) |
+
+### From `secrets` volume (auto-generated by `init-secrets`)
+
+| Variable | Generated value | Used by |
+|----------|-----------------|---------|
+| `POSTGRES_PASSWORD` | `openssl rand -hex 32` | Postgres (via `POSTGRES_PASSWORD_FILE`), app (via entrypoint) |
+| `NEXTAUTH_SECRET` | `openssl rand -base64 32` | App (entrypoint) |
+| `ENCRYPTION_KEY` | `openssl rand -hex 32` | App (entrypoint) |
+| `WORKER_SECRET` | `openssl rand -hex 32` | App + Worker (entrypoint) |
+
+`DATABASE_URL`, `REDIS_URL`, `NEXTAUTH_URL`, and `WORKER_URL` are composed automatically from the values above (DB URL by the entrypoint, the others in `docker-compose.yml`).
 
 ---
 

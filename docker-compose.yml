@@ -1,24 +1,32 @@
 services:
+  init-secrets:
+    image: alpine:3.19
+    restart: "no"
+    command: ["sh", "/init-secrets.sh"]
+    volumes:
+      - ./docker/init-secrets.sh:/init-secrets.sh:ro
+      - secrets:/secrets
+
   app:
     build:
       context: .
       dockerfile: docker/Dockerfile.next
     restart: unless-stopped
     environment:
-      DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_DB: ${POSTGRES_DB}
       REDIS_URL: redis://redis:6379
       NEXTAUTH_URL: https://${APP_DOMAIN}
-      NEXTAUTH_SECRET: ${NEXTAUTH_SECRET}
       AUTH_TRUST_HOST: "true"
       GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID}
       GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET}
       GITHUB_CLIENT_ID: ${GITHUB_CLIENT_ID}
       GITHUB_CLIENT_SECRET: ${GITHUB_CLIENT_SECRET}
-      ENCRYPTION_KEY: ${ENCRYPTION_KEY}
       WORKER_URL: http://worker:8000
-      WORKER_SECRET: ${WORKER_SECRET}
       NODE_ENV: production
     depends_on:
+      init-secrets:
+        condition: service_completed_successfully
       postgres:
         condition: service_healthy
       redis:
@@ -29,7 +37,7 @@ services:
       - internal
     labels:
       - "traefik.enable=true"
-      - "traefik.docker.network=easytinker_internal"
+      - "traefik.docker.network=easetinker_internal"
       - "traefik.http.routers.easetinker.rule=Host(`${APP_DOMAIN}`)"
       - "traefik.http.routers.easetinker.entrypoints=websecure"
       - "traefik.http.routers.easetinker.tls.certresolver=letsencrypt"
@@ -44,6 +52,7 @@ services:
       - "traefik.http.routers.easetinker.middlewares=easetinker-headers"
     volumes:
       - uploads:/data/uploads
+      - secrets:/secrets:ro
 
   worker:
     build:
@@ -52,12 +61,15 @@ services:
     restart: unless-stopped
     environment:
       REDIS_URL: redis://redis:6379
-      WORKER_SECRET: ${WORKER_SECRET}
     depends_on:
+      init-secrets:
+        condition: service_completed_successfully
       redis:
         condition: service_healthy
     networks:
       - internal
+    volumes:
+      - secrets:/secrets:ro
     # Worker is NOT exposed externally — internal only
 
   postgres:
@@ -65,10 +77,14 @@ services:
     restart: unless-stopped
     environment:
       POSTGRES_USER: ${POSTGRES_USER}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_PASSWORD_FILE: /secrets/postgres-password
       POSTGRES_DB: ${POSTGRES_DB}
     volumes:
       - postgres_data:/var/lib/postgresql/data
+      - secrets:/secrets:ro
+    depends_on:
+      init-secrets:
+        condition: service_completed_successfully
     networks:
       - internal
     healthcheck:
@@ -95,6 +111,7 @@ volumes:
   postgres_data:
   redis_data:
   uploads:
+  secrets:
 
 networks:
   internal:

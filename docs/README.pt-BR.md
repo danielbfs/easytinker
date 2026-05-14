@@ -97,13 +97,7 @@ O EaseTinker foi projetado para ser hospedado em uma **VPS da Hostinger com Dock
 
 ### Passo 1 — Pré-requisitos do Servidor
 
-Conecte-se via SSH ao seu VPS e crie a rede pública do Traefik, caso ainda não exista:
-
-```bash
-docker network create traefik-public
-```
-
-Certifique-se de que o seu domínio já está apontando para o IP do VPS.
+Certifique-se de que o seu domínio já está apontando para o IP do VPS. O stack Docker assume que já existe um Traefik rodando no host (qualquer configuração — bridge, host mode, etc).
 
 ### Passo 2 — Clonar o Repositório
 
@@ -121,20 +115,18 @@ nano .env
 
 Preencha os seguintes valores obrigatórios:
 
-| Variável | Descrição | Como gerar |
+| Variável | Descrição | Como obter |
 |----------|-----------|------------|
 | `APP_DOMAIN` | Seu domínio exato (sem `https://`) | ex: `easetinker.seudominio.com` |
-| `NEXTAUTH_SECRET` | Chave de assinatura JWT | `openssl rand -base64 32` |
-| `ENCRYPTION_KEY` | Chave AES-256-GCM para API keys | `openssl rand -hex 32` |
 | `GOOGLE_CLIENT_ID` | Client ID do OAuth Google | [Google Cloud Console](https://console.cloud.google.com/) |
 | `GOOGLE_CLIENT_SECRET` | Secret do OAuth Google | [Google Cloud Console](https://console.cloud.google.com/) |
 | `GITHUB_CLIENT_ID` | Client ID do OAuth GitHub | [GitHub Developer Settings](https://github.com/settings/developers) |
 | `GITHUB_CLIENT_SECRET` | Secret do OAuth GitHub | [GitHub Developer Settings](https://github.com/settings/developers) |
-| `POSTGRES_PASSWORD` | Senha forte para o banco de dados | `openssl rand -base64 24` |
-| `WORKER_SECRET` | Secret compartilhado para auth interna | `openssl rand -hex 32` |
 
 > **URLs de Callback OAuth** — Ao criar os apps OAuth, defina a URL de callback como:
 > `https://easetinker.seudominio.com/api/auth/callback/google` (e `/github`)
+
+> **Os secrets técnicos são gerados automaticamente.** `POSTGRES_PASSWORD`, `NEXTAUTH_SECRET`, `ENCRYPTION_KEY` e `WORKER_SECRET` são gerados no primeiro deploy pelo container `init-secrets` e armazenados no volume nomeado `secrets` — você não precisa colocá-los no `.env`. Veja [`.env.example`](.env.example) para detalhes sobre rotação.
 
 ### Passo 4 — Subir os Containers
 
@@ -142,8 +134,9 @@ Preencha os seguintes valores obrigatórios:
 docker compose up -d --build
 ```
 
-Isso cria 4 containers:
-- `easetinker-postgres` — Banco de dados PostgreSQL 16
+Isso cria 5 containers:
+- `init-secrets` — roda uma vez no primeiro boot, gera os secrets técnicos no volume `secrets` e termina
+- `easetinker-postgres` — Banco PostgreSQL 16 (lê a senha do volume `secrets`)
 - `easetinker-redis` — Cache Redis 7 e fila de jobs
 - `easetinker-worker` — Worker Python FastAPI (apenas interno)
 - `easetinker-app` — App Next.js (exposto via Traefik com HTTPS)
@@ -151,8 +144,10 @@ Isso cria 4 containers:
 ### Passo 5 — Executar as Migrations do Banco
 
 ```bash
-docker compose exec app pnpm exec prisma migrate deploy
+docker compose exec app /usr/local/bin/docker-entrypoint.sh pnpm exec prisma migrate deploy
 ```
+
+> O comando passa pelo entrypoint para que ele pegue o `DATABASE_URL` e demais env vars derivadas dos secrets (o entrypoint as lê do volume `secrets`; o `docker exec` por padrão NÃO herda env vars exportadas pelo processo principal do container).
 
 > Use `pnpm exec` (e não `npx`), para que a versão do Prisma fixada em `package.json` seja usada. `npx prisma` baixa a última versão do registry silenciosamente, podendo ser incompatível.
 
@@ -183,7 +178,7 @@ Se você instalou pelo Docker Manager da Hostinger (a UI fez o clone do repo pra
 2. Clique em **Rebuild** (ou **Redeploy**). A Hostinger clona o `main` mais recente para um diretório temporário, rebuilda as imagens e reinicia os containers. Seu `.env` e volumes nomeados são preservados.
 3. Após o rebuild terminar, aplique as migrations via SSH:
    ```bash
-   docker compose -p easetinker exec app pnpm exec prisma migrate deploy
+   docker compose -p easetinker exec app /usr/local/bin/docker-entrypoint.sh pnpm exec prisma migrate deploy
    ```
 
 ### Opção B — Manual via SSH (git clone em `/docker/easetinker/`)
@@ -200,7 +195,7 @@ git pull origin main
 docker compose up -d --build
 
 # 3. Aplicar novas migrations do banco de dados
-docker compose exec app pnpm exec prisma migrate deploy
+docker compose exec app /usr/local/bin/docker-entrypoint.sh pnpm exec prisma migrate deploy
 
 # 4. Confirmar que tudo está saudável
 docker compose ps
