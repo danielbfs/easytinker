@@ -183,23 +183,48 @@ Se você instalou pelo Docker Manager da Hostinger (a UI fez o clone do repo pra
 
 ### Opção B — Manual via SSH (git clone em `/docker/easetinker/`)
 
-Requer que você tenha originalmente seguido o [Passo 2](#passo-2--clonar-o-repositório) e que `/docker/easetinker/` seja um checkout git:
+Este é o fluxo de atualização **recomendado**. Requer que `/docker/easetinker/` seja um checkout git — ou seja, ou você seguiu o [Passo 2](#passo-2--clonar-o-repositório), ou converteu um layout vindo do Hostinger Docker Manager para clone (ver abaixo).
 
 ```bash
 cd /docker/easetinker
 
-# 1. Baixar as atualizações
+# 1. Baixar o código atualizado do GitHub
 git pull origin main
 
-# 2. Reconstruir as imagens e reiniciar os containers (sem derrubar DB/Redis)
-docker compose up -d --build
+# 2. Reconstruir as imagens sem cache (garante que o código novo entrou)
+docker compose build --no-cache
 
-# 3. Aplicar novas migrations do banco de dados
-docker compose exec app /usr/local/bin/docker-entrypoint.sh pnpm exec prisma migrate deploy
+# 3. Reiniciar os serviços, removendo containers órfãos de layouts antigos
+docker compose up -d --remove-orphans
 
-# 4. Confirmar que tudo está saudável
+# 4. Aplicar novas migrations do banco de dados
+docker compose exec -T app /usr/local/bin/docker-entrypoint.sh pnpm exec prisma migrate deploy
+
+# 5. (Opcional) liberar disco apagando imagens órfãs
+docker image prune -f
+
+# 6. Confirmar que tudo está saudável
 docker compose ps
 ```
+
+Volumes nomeados (`easetinker_postgres_data`, `easetinker_redis_data`, `easetinker_uploads`, `easetinker_secrets`) e o `.env` do projeto **não** são tocados por esses comandos — contas de usuário, banco e secrets auto-gerados sobrevivem à atualização.
+
+#### Conversão única do layout Hostinger Docker Manager
+
+Se você instalou pela UI do Docker Manager da Hostinger, `/docker/easetinker/` não é um checkout git. Rode isto **uma única vez** para converter (preserva `.env` e volumes nomeados):
+
+```bash
+cd /docker
+TS=$(date +%s)
+mv easetinker easetinker.bak.$TS
+git clone https://github.com/danielbfs/easetinker.git easetinker
+cp easetinker.bak.$TS/.env easetinker/.env
+chmod 600 easetinker/.env
+# Confira que o novo diretório está correto e então:
+rm -rf /docker/easetinker.bak.$TS
+```
+
+Depois disso, **não clique** mais no botão Update/Rebuild da UI da Hostinger — ele pode sobrescrever o diretório. Use o fluxo SSH acima para toda atualização.
 
 > **Dica:** Assine as [GitHub Releases](https://github.com/danielbfs/easetinker/releases) para ser notificado quando novas versões forem publicadas.
 
