@@ -4,7 +4,9 @@ RUN corepack enable && corepack prepare pnpm@9 --activate
 WORKDIR /app
 
 COPY package.json pnpm-lock.yaml .npmrc ./
+COPY prisma ./prisma
 RUN pnpm install --frozen-lockfile
+RUN pnpm exec prisma generate
 
 # ─── Stage 2: builder ─────────────────────────────────────────────────────────
 FROM node:20-alpine AS builder
@@ -13,9 +15,6 @@ WORKDIR /app
 
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
-
-# Generate Prisma Client
-RUN ./node_modules/.bin/prisma generate
 
 ENV NEXT_TELEMETRY_DISABLED=1
 RUN pnpm build
