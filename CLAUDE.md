@@ -17,12 +17,20 @@ Production: https://easetinker.sigame.tec.br (Hostinger VPS, single instance).
 
 ## Deploy & ops — READ THIS FIRST
 
-The project on the server is at `/docker/easetinker/` and **is a real git checkout** of `main`. The Hostinger Docker Manager UI was used originally but **must not be used for updates anymore** — its Rebuild button can clobber the working tree. Convert any UI-managed instance by running the one-time procedure in `README.md` → Updating → Option B.
+The project on the server is at `/docker/easetinker/` and **is a real git checkout** of the **`stable`** branch. The Hostinger Docker Manager UI was used originally but **must not be used for updates anymore** — its Rebuild button can clobber the working tree. Convert any UI-managed instance by running the one-time procedure in `README.md` → Updating → Option B.
+
+### Branch model
+
+- **`stable`** — what production runs. Only advances when a release is cut (typically from `main`). Each advance corresponds to a semver tag (`vX.Y.Z`).
+- **`main`** — active development; may be unstable. Do not deploy directly from here.
+- **Pre-release tags** (`vX.Y.Z-beta.N`) — cut from `main` for semi-ready versions you want to try out. GitHub Releases marks them as "Pre-release".
+
+When cutting a new release: tag the chosen commit (usually `HEAD` of `main`), fast-forward `stable` to that tag, push both, then create the GitHub Release pointing at the tag with `--target stable` for stables (omit `--prerelease`) or with `--prerelease` for betas.
 
 **Update flow** (the only flow):
 ```bash
 cd /docker/easetinker
-git pull origin main
+git pull origin stable
 docker compose build --no-cache
 docker compose up -d --remove-orphans
 docker compose exec -T app /usr/local/bin/docker-entrypoint.sh pnpm exec prisma migrate deploy
@@ -31,6 +39,8 @@ docker compose ps
 ```
 
 The migration command **must go through the entrypoint** — `docker exec` doesn't inherit env vars exported by the container's PID 1, and `DATABASE_URL` is one of them.
+
+> **Migrating an existing checkout from `main` to `stable`** (one-time, on the server): `cd /docker/easetinker && git fetch origin && git checkout stable && git branch --set-upstream-to=origin/stable stable`. After this, `git pull` follows `stable` by default.
 
 ### Auto-generated secrets
 
@@ -77,7 +87,7 @@ We just landed the **Tinker credentials** feature end-to-end:
 ## Quick references
 
 - Repo: https://github.com/danielbfs/easetinker
-- Releases: https://github.com/danielbfs/easetinker/releases (v0.1.0 is the first production-ready cut)
+- Releases: https://github.com/danielbfs/easetinker/releases (v0.1.1 is the latest stable; v0.1.0 was the first production-ready cut)
 - Prod URL: https://easetinker.sigame.tec.br
 - Tinker docs: https://tinker-docs.thinkingmachines.ai/tinker/api-reference/serviceclient/
 - Server SSH: `root@2.24.98.243` (password is in the user's vault, not here)

@@ -101,8 +101,10 @@ Make sure your domain is already pointing to your VPS IP address. The Docker sta
 
 ### Step 2 — Clone the Repository
 
+Clone the `stable` branch — that's the production-ready line. (`main` is active development.)
+
 ```bash
-git clone https://github.com/danielbfs/easetinker.git /docker/easetinker
+git clone -b stable https://github.com/danielbfs/easetinker.git /docker/easetinker
 cd /docker/easetinker
 ```
 
@@ -168,6 +170,8 @@ Open `https://easetinker.yourdomain.com` in your browser. Traefik configures SSL
 
 ## Updating to a New Version
 
+> **Branch model.** Production tracks the **`stable`** branch — it only advances when a release is cut. Day-to-day work happens on `main` and may be unstable. Pre-releases (e.g. `v0.2.0-beta.1`) are tagged from `main` for semi-ready cuts. See [Releases](https://github.com/danielbfs/easetinker/releases) for the changelog.
+
 Pick the section that matches how you set up the server in the first place.
 
 ### Option A — Hostinger Docker Manager (UI-driven)
@@ -188,8 +192,8 @@ This is the **recommended** update flow. It requires that `/docker/easetinker/` 
 ```bash
 cd /docker/easetinker
 
-# 1. Pull the latest code from GitHub
-git pull origin main
+# 1. Pull the latest stable release from GitHub
+git pull origin stable
 
 # 2. Rebuild images without cache (guarantees the new code lands)
 docker compose build --no-cache
@@ -217,7 +221,7 @@ If you installed via the Hostinger Docker Manager UI, `/docker/easetinker/` is n
 cd /docker
 TS=$(date +%s)
 mv easetinker easetinker.bak.$TS
-git clone https://github.com/danielbfs/easetinker.git easetinker
+git clone -b stable https://github.com/danielbfs/easetinker.git easetinker
 cp easetinker.bak.$TS/.env easetinker/.env
 chmod 600 easetinker/.env
 # Verify the new directory looks right, then:

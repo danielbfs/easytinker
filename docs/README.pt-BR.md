@@ -101,8 +101,10 @@ Certifique-se de que o seu domínio já está apontando para o IP do VPS. O stac
 
 ### Passo 2 — Clonar o Repositório
 
+Clone a branch `stable` — é a linha pronta para produção. (`main` é desenvolvimento ativo.)
+
 ```bash
-git clone https://github.com/danielbfs/easetinker.git /docker/easetinker
+git clone -b stable https://github.com/danielbfs/easetinker.git /docker/easetinker
 cd /docker/easetinker
 ```
 
@@ -168,6 +170,8 @@ Acesse `https://easetinker.seudominio.com` no navegador. O Traefik configura o S
 
 ## Atualizando para uma Nova Versão
 
+> **Modelo de branches.** Produção acompanha a branch **`stable`** — ela só avança quando uma release é cortada. O dia a dia acontece em `main` e pode estar instável. Pré-releases (ex.: `v0.2.0-beta.1`) são taggeadas a partir do `main` para versões semi-prontas. Veja as [Releases](https://github.com/danielbfs/easetinker/releases) para o changelog.
+
 Escolha a seção que combina com a forma como você configurou o servidor originalmente.
 
 ### Opção A — Hostinger Docker Manager (via UI)
@@ -188,8 +192,8 @@ Este é o fluxo de atualização **recomendado**. Requer que `/docker/easetinker
 ```bash
 cd /docker/easetinker
 
-# 1. Baixar o código atualizado do GitHub
-git pull origin main
+# 1. Baixar a versão estável mais recente do GitHub
+git pull origin stable
 
 # 2. Reconstruir as imagens sem cache (garante que o código novo entrou)
 docker compose build --no-cache
@@ -217,7 +221,7 @@ Se você instalou pela UI do Docker Manager da Hostinger, `/docker/easetinker/` 
 cd /docker
 TS=$(date +%s)
 mv easetinker easetinker.bak.$TS
-git clone https://github.com/danielbfs/easetinker.git easetinker
+git clone -b stable https://github.com/danielbfs/easetinker.git easetinker
 cp easetinker.bak.$TS/.env easetinker/.env
 chmod 600 easetinker/.env
 # Confira que o novo diretório está correto e então:
